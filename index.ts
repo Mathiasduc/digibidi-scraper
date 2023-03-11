@@ -1,31 +1,30 @@
 import puppeteer from "puppeteer";
 import fs from "fs";
 import * as dotenv from "dotenv";
-import { sleep } from "./utils";
+import { mkDirByPathSync, sleep } from "./utils";
 
 dotenv.config();
 
 (async () => {
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
-  // await page.setViewport({
-  //   width: 3840,
-  //   height: 2160,
-  //   deviceScaleFactor: 1,
-  // });
 
+  const SITE_URL = "www.digibidi.com";
   // login to the website
-  await page.goto("https://www.digibidi.com/account/login");
+  await page.goto(`https://${SITE_URL}/account/login`);
   await page.type("#id_email", process.env.LOGIN as string);
   await page.type("#id_password", process.env.PASSWORD as string);
   await page.click("div.submit > input[type=submit]");
   await page.waitForNavigation();
   await sleep(434);
 
+  const BOOK_SLUG_NAME = process.env.BOOK_SLUG_NAME as string;
+  console.log({ BOOK_SLUG_NAME });
+
   // go to the book player
-  await page.goto("https://www.digibidi.com/player/full/rahan-le-mariage-de-rahan");
+  await page.goto(`https://${SITE_URL}/player/full/${BOOK_SLUG_NAME}`);
   await page.waitForNetworkIdle();
-  await sleep(811);
+  await sleep(311);
 
   // get the number of pages
   const listOfPageKey = await page.evaluate(() => {
@@ -35,21 +34,25 @@ dotenv.config();
   });
   console.log({ listOfPageKey });
 
-  //@ts-ignore
+  // @ts-ignore
   const PLAYER_KEY = await page.evaluate(() => window.player_key);
   console.log({ PLAYER_KEY });
-  function getPageIdFromKey(pageKey: string) {
+  const getPageIdFromKey = (pageKey: string) => {
     const obfuscate1 =
       65536 | (parseInt(PLAYER_KEY.slice(0, 4), 16) ^ parseInt(pageKey.slice(0, 4), 16));
     const obfuscate2 = 65536 | (parseInt(PLAYER_KEY.slice(4), 16) ^ parseInt(pageKey.slice(4), 16));
     return obfuscate1.toString(16).slice(1) + obfuscate2.toString(16).slice(1);
-  }
+  };
 
   const pageIdToPageNameHashMap = listOfPageKey.reduce(
     (acc, { key, value }) => ({ ...acc, [getPageIdFromKey(key)]: value }),
     {} as Record<string, string>
   );
   console.log({ pageIdToPageNameHashMap });
+
+  const bookFolderName = `books/${BOOK_SLUG_NAME}`;
+  // create a folder named after the book slug name
+  mkDirByPathSync(bookFolderName);
 
   // register the response listener to save the images if they are not already saved
   const savedImagesIds = new Set();
@@ -69,11 +72,12 @@ dotenv.config();
       }
 
       const buffer = await response.buffer();
-      fs.writeFileSync(
-        `images/image-${pageId}-${pageIdToPageNameHashMap[pageId]}.${extension}`,
-        buffer,
-        "base64"
-      );
+      const pageName = pageIdToPageNameHashMap[pageId];
+      const pageFileName = `${bookFolderName}/page-${
+        pageName === "cover" ? `001-${pageName}` : pageName.padStart(3, "0")
+      }-${pageId}.${extension}`;
+      console.log(`saving page "${pageFileName}"`);
+      fs.writeFileSync(pageFileName, buffer, "base64");
     }
   });
 
@@ -86,18 +90,15 @@ dotenv.config();
   });
   await page.waitForNetworkIdle();
   await sleep(356);
-  await page.screenshot({ path: `images/screenshot.png` });
 
   const numberOfPages = listOfPageKey.length;
   // click on the next page button up to the last page
   // starting at 1 because the first page is already loaded
   for (let i = 1; i < numberOfPages; i += 1) {
-    console.log({ i });
-
+    console.log("navigating to page ", i);
     await page.click("div#contents-wrapper > img");
     await page.waitForNetworkIdle();
     await sleep(256);
-    // await page.screenshot({ path: `images/screenshot-${i}.png` });
   }
 
   await browser.close();
