@@ -1,5 +1,5 @@
-import fs from "fs";
-import path from "path";
+import * as fs from "fs";
+import * as path from "path";
 
 export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

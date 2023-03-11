@@ -1,5 +1,5 @@
 import puppeteer from "puppeteer";
-import fs from "fs";
+import * as fs from "fs";
 import * as dotenv from "dotenv";
 import { mkDirByPathSync, sleep } from "./utils";
 
@@ -9,21 +9,25 @@ dotenv.config();
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
 
+  const BOOK_SLUG_NAME = process.env.BOOK_SLUG_NAME as string;
+  console.log("scrapping book ", BOOK_SLUG_NAME);
+
   const SITE_URL = "www.digibidi.com";
   // login to the website
   await page.goto(`https://${SITE_URL}/account/login`);
   await page.type("#id_email", process.env.LOGIN as string);
   await page.type("#id_password", process.env.PASSWORD as string);
   await page.click("div.submit > input[type=submit]");
+  console.log("waiting for login...");
   await page.waitForNavigation();
+  console.log("logged in");
   await sleep(434);
 
-  const BOOK_SLUG_NAME = process.env.BOOK_SLUG_NAME as string;
-  console.log({ BOOK_SLUG_NAME });
-
   // go to the book player
+  console.log("opening the player for the book...");
   await page.goto(`https://${SITE_URL}/player/full/${BOOK_SLUG_NAME}`);
   await page.waitForNetworkIdle();
+  console.log("player opened");
   await sleep(311);
 
   // get the number of pages
@@ -48,7 +52,7 @@ dotenv.config();
     (acc, { key, value }) => ({ ...acc, [getPageIdFromKey(key)]: value }),
     {} as Record<string, string>
   );
-  console.log({ pageIdToPageNameHashMap });
+  // console.log({ pageIdToPageNameHashMap });
 
   const bookFolderName = `books/${BOOK_SLUG_NAME}`;
   // create a folder named after the book slug name
@@ -91,7 +95,7 @@ dotenv.config();
   await page.waitForNetworkIdle();
   await sleep(356);
 
-  const numberOfPages = listOfPageKey.length;
+  const numberOfPages = listOfPageKey.length - 1;
   // click on the next page button up to the last page
   // starting at 1 because the first page is already loaded
   for (let i = 1; i < numberOfPages; i += 1) {
