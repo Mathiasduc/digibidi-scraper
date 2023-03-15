@@ -33,3 +33,15 @@ export const mkDirByPathSync = (targetDir: string, { isRelativeToScript = false 
     return curDir;
   }, initDir);
 };
+
+export const writeFileIfNotExistsSync = (
+  filename: string,
+  content: any,
+  fsWriteSyncOptions?: fs.WriteFileOptions
+): void => {
+  if (!fs.existsSync(filename)) {
+    fs.writeFileSync(filename, content, fsWriteSyncOptions);
+  } else {
+    console.log(`File "${filename}" already exists, skipping...`);
+  }
+};
